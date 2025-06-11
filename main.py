@@ -1,14 +1,14 @@
+from typing import List
+from uuid import uuid4, UUID
+
 from fastapi import FastAPI, HTTPException, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
-from typing import List
-from uuid import uuid4, UUID
 
 from schemas import PodcastEpisode, EpisodeCreateRequest, GenerationRequest, GenerationResponse
-from storage import episode_storage
 from services.llm_client import generate_alternative_text
+from storage import episode_storage
 
 app = FastAPI()
 
@@ -30,7 +30,8 @@ def index(request: Request):
 
 
 @app.post("/create")
-def create_episode_web(request: Request, title: str = Form(...), description: str = Form(...), host: str = Form(...)):
+def create_episode_web(request: Request, title: str = Form(...),
+                       description: str = Form(...), host: str = Form(...)):
     episode_id = uuid4()
     episode = PodcastEpisode(id=episode_id, title=title, description=description, host=host)
     episode_storage[episode_id] = episode
@@ -92,7 +93,8 @@ async def generate_alternative(episode_id: UUID, request: GenerationRequest):
 
 
 @app.post("/generate/{episode_id}")
-async def generate_from_form(request: Request, episode_id: UUID, target: str = Form(...), prompt: str = Form(...)):
+async def generate_from_form(request: Request, episode_id: UUID, target: str = Form(...),
+                             prompt: str = Form(...)):
     episode = episode_storage.get(episode_id)
     if not episode:
         raise HTTPException(status_code=404, detail="Episode not found.")
@@ -103,7 +105,6 @@ async def generate_from_form(request: Request, episode_id: UUID, target: str = F
         f"Ведучий: {episode.host}"
     )
     alternative = await generate_alternative_text(context, prompt)
-
 
     generated_texts[episode_id] = alternative
 
