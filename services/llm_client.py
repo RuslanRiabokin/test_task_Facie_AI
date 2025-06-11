@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from config import (
     USE_OPENROUTER,
     AZURE_OPENAI_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT_ID,
@@ -39,4 +40,4 @@ async def generate_alternative_text(context: str, prompt: str) -> str:
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        return f"❌ AI error: {str(e)}"
+        raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")

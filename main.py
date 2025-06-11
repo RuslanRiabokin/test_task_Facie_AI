@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, Request, Form  # 🆕 Request, Form
-from fastapi.responses import RedirectResponse  # 🆕 для редиректа после формы
-from fastapi.staticfiles import StaticFiles  # 🆕 для статики
-from fastapi.templating import Jinja2Templates  # 🆕 для шаблонов
+from fastapi import FastAPI, HTTPException, Request, Form
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import List
 from uuid import uuid4, UUID
@@ -12,19 +12,23 @@ from services.llm_client import generate_alternative_text
 
 app = FastAPI()
 
-# 🆕 Подключаем директорию со статикой и шаблонами
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
-# 🆕 HTML: Главная страница со списком эпизодов и формой добавления
+generated_texts: dict[UUID, str] = {}
+
+
 @app.get("/")
 def index(request: Request):
     episodes = list(episode_storage.values())
-    return templates.TemplateResponse("index.html", {"request": request, "episodes": episodes})
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "episodes": episodes,
+        "generated_texts": generated_texts
+    })
 
 
-# 🆕 HTML: Обработка формы добавления эпизода
 @app.post("/create")
 def create_episode_web(request: Request, title: str = Form(...), description: str = Form(...), host: str = Form(...)):
     episode_id = uuid4()
@@ -33,7 +37,6 @@ def create_episode_web(request: Request, title: str = Form(...), description: st
     return RedirectResponse(url="/", status_code=302)
 
 
-# ✅ REST API
 @app.get("/episodes", response_model=List[PodcastEpisode])
 def get_episodes():
     return list(episode_storage.values())
@@ -86,3 +89,22 @@ async def generate_alternative(episode_id: UUID, request: GenerationRequest):
         prompt=request.prompt,
         generated_alternative=alternative
     )
+
+
+@app.post("/generate/{episode_id}")
+async def generate_from_form(request: Request, episode_id: UUID, target: str = Form(...), prompt: str = Form(...)):
+    episode = episode_storage.get(episode_id)
+    if not episode:
+        raise HTTPException(status_code=404, detail="Episode not found.")
+
+    context = (
+        f"Назва: {episode.title}\n"
+        f"Опис: {episode.description}\n"
+        f"Ведучий: {episode.host}"
+    )
+    alternative = await generate_alternative_text(context, prompt)
+
+
+    generated_texts[episode_id] = alternative
+
+    return RedirectResponse("/", status_code=302)
